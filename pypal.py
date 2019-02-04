@@ -18,11 +18,16 @@ class State(object):
         self.relTo={'X':0,'Y':0,'Z':0,'E':0}
         self.state={'X':0,'Y':0,'Z':0,'E':0}
         self.lines=0
+        self.extruder=0
         self.absolute=True
+        self.layer=0
 
     def count(self):
         self.lines+=1
-    
+
+    def beginLayer(self):
+        self.layer+=1
+        
     def move(self,axis,value):
         if self.absolute:
             self.state[axis]=value
@@ -36,6 +41,14 @@ class State(object):
         self.relTo[axis]=self.absPos(axis)-value
         self.state[axis]=value
 
+    def setExtruder(self,extrNo):
+        self.extruder=extrNo
+        
+    def __str__(self):
+        res='line [%d] layer:%d extruder:%d '%(self.lines,self.layer,self.extruder)
+        for axis in self.state:
+            res+=" %s:%s"%(axis,self.absPos(axis))
+        return res
 
 class Command(object):
     COMMENT_PRE=r'\s*;\s*'
@@ -48,7 +61,7 @@ class Command(object):
 
 class CountCmd(Command):
     def process(self,line,processor):
-        processor.state.count()
+        processor.count()
         return False
 
 
@@ -57,11 +70,10 @@ class MoveCmd(Command):
 
     def process(self,line,processor):
         m=self.PATTERN.match(line)
-        pos=processor.state
         if m:
             i=2
             while i<len(m.groups()) and m.group(i):
-                pos.move(m.group(i),float(m.group(i+1)))
+                processor.move(m.group(i),float(m.group(i+1)))
                 i+=3
         return m!=None    
         
@@ -70,11 +82,10 @@ class HomeCmd(Command):
 
     def process(self,line,processor):
         m=self.PATTERN.match(line)
-        pos=processor.state
         if m:
             i=2
             while i<len(m.groups()) and m.group(i):
-                pos.move(m.group(i),0)
+                processor.move(m.group(i),0)
                 i+=1
         return m!=None    
 
@@ -83,18 +94,36 @@ class SetPosCmd(Command):
 
     def process(self,line,processor):
         m=self.PATTERN.match(line)
-        pos=processor.state
         if m:
             i=2
             while i<len(m.groups()) and m.group(i):
-                pos.setPos(m.group(i),float(m.group(i+1)))
+                processor.setPos(m.group(i),float(m.group(i+1)))
                 i+=3
         return m!=None    
+
+
+class ToolChange(Command):
+    TOOL_CHANGE=re.compile(r'^%schanging logical extruder (from T[0-9])? to T([0-9])'%Command.COMMENT_PRE)
+
+    def process(self,line,processor):
+        m=self.TOOL_CHANGE.match(line)
+        if m:
+            processor.setExtruder(int(m.group(2)))
+        return m!=None
+
+class BeginLayer(Command):
+    BEGIN_LAYER=re.compile(r'^%sBEGIN_LAYER_OBJECT'%Command.COMMENT_PRE)
+    print BEGIN_LAYER.match('; BEGIN_LAYER_OBJECT z=0.300 z_thickness=0.150')
+    def process(self,line,processor):
+        m=self.BEGIN_LAYER.match(line)
+        if m:
+            processor.beginLayer()
+        return m!=None
+
 
 class ModifyCommand(Command):
     def process(self,line,processor):
         return line
-
 
 class LookForChangeStart(ModifyCommand):
     COLOR_CHANGE=re.compile(r'^%stoolchange'%Command.COMMENT_PRE)
@@ -121,7 +150,7 @@ class ChangeSpeed(ModifyCommand):
         m=self.EXTRUDER_PAT.match(line)
         if m:
             nline=self.EXTRUDER_REP%m.group(1)
-            print 'line [%d] changing "%s" --> "%s"'%(processor.state.lines,line.strip(),nline.strip())
+            print '%s changing "%s" --> "%s"'%(processor.state,line.strip(),nline.strip())
             line=nline
         return line
     
@@ -130,17 +159,25 @@ class Processor(object):
     DEFAULT='D'
     CHANGE='C'
 
-    GENERAL_TABLE=[CountCmd(),MoveCmd(),HomeCmd(),SetPosCmd()]
+    GENERAL_TABLE=[CountCmd(),MoveCmd(),HomeCmd(),SetPosCmd(),ToolChange(),BeginLayer()]
     MODE_TABLE={DEFAULT:[LookForChangeStart()],CHANGE:[ChangeSpeed(),LookForChangeEnd()]}
     
     def __init__(self,args):
         self.args=args
         self.state=State()
+        self.setPos=self.state.setPos
+        self.move=self.state.move
+        self.count=self.state.count
+        self.setExtruder=self.state.setExtruder
+        self.beginLayer=self.state.beginLayer
         self.mode=Processor.DEFAULT
 
     def setMode(self,mode):
         self.mode=mode
-        
+
+    def setExtruder(self,extrNo):
+        self.extrNo=extrNo
+    
     def process(self):
         with open(args.output,'w') as ofd:
             with open(self.args.input,'r') as fd:
@@ -155,9 +192,10 @@ class Processor(object):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='processing a palette gcode file')
     parser.add_argument('-i', '--input',help='input file ',required=True)
-    parser.add_argument('-o', '--output',help='output file ',required=True)
+    parser.add_argument('-o', '--output',help='output file ',default='/dev/null')
 
     args = parser.parse_args()
+    print args
     proc=Processor(args)
     proc.process()
 
