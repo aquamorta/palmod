@@ -12,6 +12,18 @@
 import argparse
 import re
 
+
+SETTINGS={
+    'EXTRUDER_CHANGE':r'^\s*;\s*changing logical extruder (from T[0-9])? to T([0-9])',
+    'BEGIN_LAYER':r'^\s*;\s*BEGIN_LAYER_OBJECT',
+    'BEGIN_COLOR_CHANGE':r'^\s*;\s*toolchange',
+    'END_COLOR_CHANGE':r'^^\s*;\s*endchroma',
+    'EXTRUDE_PAT':r'^(G0?1\s+E-?(\d+\.?\d*|\.\d+))\s+F2400\s+',
+    'EXTRUDE_SUB':r'%s F200\r\n'
+    
+    }
+
+
 class State(object):
 
     def __init__(self):
@@ -59,6 +71,10 @@ class Command(object):
     def process(self,line,processor):
         return False
 
+    @classmethod
+    def initClass(cls,settings):
+        pass
+    
 class CountCmd(Command):
     def process(self,line,processor):
         processor.count()
@@ -113,7 +129,6 @@ class ToolChange(Command):
 
 class BeginLayer(Command):
     BEGIN_LAYER=re.compile(r'^%sBEGIN_LAYER_OBJECT'%Command.COMMENT_PRE)
-    print BEGIN_LAYER.match('; BEGIN_LAYER_OBJECT z=0.300 z_thickness=0.150')
     def process(self,line,processor):
         m=self.BEGIN_LAYER.match(line)
         if m:
@@ -126,28 +141,28 @@ class ModifyCommand(Command):
         return line
 
 class LookForChangeStart(ModifyCommand):
-    COLOR_CHANGE=re.compile(r'^%stoolchange'%Command.COMMENT_PRE)
+    BEGIN_COLOR_CHANGE=re.compile(r'^%stoolchange'%Command.COMMENT_PRE)
 
     def process(self,line,processor):
-        if self.COLOR_CHANGE.match(line):
+        if self.BEGIN_COLOR_CHANGE.match(line):
             processor.setMode(processor.CHANGE)
         return line
 
 class LookForChangeEnd(ModifyCommand):
-    COLOR_CHANGE_END=re.compile(r'^%sendchroma'%Command.COMMENT_PRE)
+    END_COLOR_CHANGE=re.compile(r'^%sendchroma'%Command.COMMENT_PRE)
 
     def process(self,line,processor):
-        if self.COLOR_CHANGE_END.match(line):
+        if self.END_COLOR_CHANGE.match(line):
             processor.setMode(processor.DEFAULT)
         return line
 
             
 class ChangeSpeed(ModifyCommand):
-    EXTRUDER_PAT=re.compile(r'^(G0?1\s+E%s)\s+F2400\s+'%Command.FLOAT_PAT)
+    EXTRUDE_PAT=re.compile(r'^(G0?1\s+E%s)\s+F2400\s+'%Command.FLOAT_PAT)
     EXTRUDER_REP='%s F200\r\n'
 
     def process(self,line,processor):
-        m=self.EXTRUDER_PAT.match(line)
+        m=self.EXTRUDE_PAT.match(line)
         if m:
             nline=self.EXTRUDER_REP%m.group(1)
             print '%s changing "%s" --> "%s"'%(processor.state,line.strip(),nline.strip())
@@ -190,6 +205,7 @@ class Processor(object):
                     ofd.write(line)
 
 if __name__ == '__main__':
+    [c.initClass(SETTINGS) for c in Command.__subclasses__()]
     parser = argparse.ArgumentParser(description='processing a palette gcode file')
     parser.add_argument('-i', '--input',help='input file ',required=True)
     parser.add_argument('-o', '--output',help='output file ',default='/dev/null')
