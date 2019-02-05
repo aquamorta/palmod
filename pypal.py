@@ -19,7 +19,7 @@ SETTINGS={
     'BEGIN_COLOR_CHANGE':r'^\s*;\s*toolchange',
     'END_COLOR_CHANGE':r'^^\s*;\s*endchroma',
     'EXTRUDE_PAT':r'^(G0?1\s+E-?(\d+\.?\d*|\.\d+))\s+F2400\s+',
-    'EXTRUDE_SUB':r'%s F200\r\n'
+    'EXTRUDE_SUB':'%s F200\r\n'
     
     }
 
@@ -72,7 +72,7 @@ class Command(object):
         return False
 
     @classmethod
-    def initClass(cls,settings):
+    def setup(cls,settings):
         pass
     
 class CountCmd(Command):
@@ -119,16 +119,23 @@ class SetPosCmd(Command):
 
 
 class ToolChange(Command):
-    TOOL_CHANGE=re.compile(r'^%schanging logical extruder (from T[0-9])? to T([0-9])'%Command.COMMENT_PRE)
+
+    @classmethod
+    def setup(cls,settings):
+        cls.EXTRUDER_CHANGE=re.compile(settings['EXTRUDER_CHANGE'])
 
     def process(self,line,processor):
-        m=self.TOOL_CHANGE.match(line)
+        m=self.EXTRUDER_CHANGE.match(line)
         if m:
             processor.setExtruder(int(m.group(2)))
         return m!=None
 
 class BeginLayer(Command):
-    BEGIN_LAYER=re.compile(r'^%sBEGIN_LAYER_OBJECT'%Command.COMMENT_PRE)
+
+    @classmethod
+    def setup(cls,settings):
+        cls.BEGIN_LAYER=re.compile(settings['BEGIN_LAYER'])
+
     def process(self,line,processor):
         m=self.BEGIN_LAYER.match(line)
         if m:
@@ -140,8 +147,12 @@ class ModifyCommand(Command):
     def process(self,line,processor):
         return line
 
+
 class LookForChangeStart(ModifyCommand):
-    BEGIN_COLOR_CHANGE=re.compile(r'^%stoolchange'%Command.COMMENT_PRE)
+
+    @classmethod
+    def setup(cls,settings):
+        cls.BEGIN_COLOR_CHANGE=re.compile(settings['BEGIN_COLOR_CHANGE'])
 
     def process(self,line,processor):
         if self.BEGIN_COLOR_CHANGE.match(line):
@@ -149,7 +160,10 @@ class LookForChangeStart(ModifyCommand):
         return line
 
 class LookForChangeEnd(ModifyCommand):
-    END_COLOR_CHANGE=re.compile(r'^%sendchroma'%Command.COMMENT_PRE)
+
+    @classmethod
+    def setup(cls,settings):
+        cls.END_COLOR_CHANGE=re.compile(settings['END_COLOR_CHANGE'])
 
     def process(self,line,processor):
         if self.END_COLOR_CHANGE.match(line):
@@ -158,13 +172,16 @@ class LookForChangeEnd(ModifyCommand):
 
             
 class ChangeSpeed(ModifyCommand):
-    EXTRUDE_PAT=re.compile(r'^(G0?1\s+E%s)\s+F2400\s+'%Command.FLOAT_PAT)
-    EXTRUDER_REP='%s F200\r\n'
+
+    @classmethod
+    def setup(cls,settings):
+        cls.EXTRUDE_PAT=re.compile(settings['EXTRUDE_PAT'])
+        cls.EXTRUDE_SUB=settings['EXTRUDE_SUB']
 
     def process(self,line,processor):
         m=self.EXTRUDE_PAT.match(line)
         if m:
-            nline=self.EXTRUDER_REP%m.group(1)
+            nline=self.EXTRUDE_SUB%m.group(1)
             print '%s changing "%s" --> "%s"'%(processor.state,line.strip(),nline.strip())
             line=nline
         return line
@@ -194,24 +211,24 @@ class Processor(object):
         self.extrNo=extrNo
     
     def process(self):
-        with open(args.output,'w') as ofd:
-            with open(self.args.input,'r') as fd:
-                for line in fd.readlines():
-                    for cmd in self.GENERAL_TABLE:
-                        if cmd.process(line,self):
-                            break
-                    for cmd in self.MODE_TABLE.get(self.mode,[]):
-                        line=cmd.process(line,self)
-                    ofd.write(line)
+        for line in args.input.readlines():
+            for cmd in self.GENERAL_TABLE:
+                if cmd.process(line,self):
+                    break
+            for cmd in self.MODE_TABLE.get(self.mode,[]):
+                line=cmd.process(line,self)
+            args.output.write(line)
+        args.input.close()
+        args.output.close()
 
 if __name__ == '__main__':
-    [c.initClass(SETTINGS) for c in Command.__subclasses__()]
+    [c.setup(SETTINGS) for c in Command.__subclasses__()]
+    [c.setup(SETTINGS) for c in ModifyCommand.__subclasses__()]
     parser = argparse.ArgumentParser(description='processing a palette gcode file')
-    parser.add_argument('-i', '--input',help='input file ',required=True)
-    parser.add_argument('-o', '--output',help='output file ',default='/dev/null')
+    parser.add_argument('input',help='input file ',type=argparse.FileType('r'))
+    parser.add_argument('-o', '--output',help='output file ',type=argparse.FileType('wb', 0),default='/dev/null')
 
     args = parser.parse_args()
-    print args
     proc=Processor(args)
     proc.process()
 
