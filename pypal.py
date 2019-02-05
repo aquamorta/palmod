@@ -33,6 +33,7 @@ class State(object):
         self.extruder=0
         self.absolute=True
         self.layer=0
+        self.extrChanges=0
 
     def count(self):
         self.lines+=1
@@ -55,6 +56,16 @@ class State(object):
 
     def setExtruder(self,extrNo):
         self.extruder=extrNo
+        self.extrChanges+=1
+
+    def summary(self):
+        return """
+summary:
+====================================
+lines processed :%d
+layers          :%d
+extruder changes:%d
+"""%(self.lines,self.layer,self.extrChanges)
         
     def __str__(self):
         res='line [%d] layer:%d extruder:%d '%(self.lines,self.layer,self.extruder)
@@ -182,7 +193,8 @@ class ChangeSpeed(ModifyCommand):
         m=self.EXTRUDE_PAT.match(line)
         if m:
             nline=self.EXTRUDE_SUB%m.group(1)
-            print '%s changing "%s" --> "%s"'%(processor.state,line.strip(),nline.strip())
+            if processor.verbosity()>0:
+                print '%s changing "%s" --> "%s"'%(processor.state,line.strip(),nline.strip())
             line=nline
         return line
     
@@ -209,6 +221,9 @@ class Processor(object):
 
     def setExtruder(self,extrNo):
         self.extrNo=extrNo
+
+    def verbosity(self):
+        return self.args.verbose
     
     def process(self):
         for line in args.input.readlines():
@@ -221,15 +236,20 @@ class Processor(object):
         args.input.close()
         args.output.close()
 
+    def printSummary(self):
+        print self.state.summary()
+        
 if __name__ == '__main__':
     [c.setup(SETTINGS) for c in Command.__subclasses__()]
     [c.setup(SETTINGS) for c in ModifyCommand.__subclasses__()]
     parser = argparse.ArgumentParser(description='processing a palette gcode file')
     parser.add_argument('input',help='input file ',type=argparse.FileType('r'))
     parser.add_argument('-o', '--output',help='output file ',type=argparse.FileType('wb', 0),default='/dev/null')
+    parser.add_argument('-v', '--verbose',help='verbosity level ',type=int,default=0)
 
     args = parser.parse_args()
     proc=Processor(args)
     proc.process()
+    proc.printSummary()
 
 
