@@ -193,6 +193,7 @@ class ChangeSpeed(ModifyCommand):
 class Processor(object):
     DEFAULT='D'
     CHANGE='C'
+    
 
     GENERAL_TABLE=[CountCmd(),MoveCmd(),HomeCmd(),SetPosCmd(),ToolChange(),BeginLayer()]
     MODE_TABLE={DEFAULT:[LookForChangeStart()],CHANGE:[ChangeSpeed(),LookForChangeEnd()]}
@@ -235,7 +236,7 @@ SETTINGS={
     'BEGIN_LAYER':r'^\s*;\s*BEGIN_LAYER_OBJECT',
     'BEGIN_COLOR_CHANGE':r'^\s*;\s*toolchange',
     'END_COLOR_CHANGE':r'^^\s*;\s*endchroma',
-    'EXTRUDE_PAT':r'^(G0?1\s+E-?(\d+\.?\d*|\.\d+))\s+F-?(\d+\.?\d*|\.\d+)\s+',
+    'EXTRUDE_PAT':r'^(G0?1\s+E-?(\d+\.?\d*|\.\d+))\s+F-?(\d+\.?\d*|\.\d+)\s*$',
     'EXTRUDE_SUB':'%s F200\r\n'
     
     }
