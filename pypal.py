@@ -13,15 +13,6 @@ import argparse
 import re
 
 
-SETTINGS={
-    'EXTRUDER_CHANGE':r'^\s*;\s*changing logical extruder (from T[0-9])? to T([0-9])',
-    'BEGIN_LAYER':r'^\s*;\s*BEGIN_LAYER_OBJECT',
-    'BEGIN_COLOR_CHANGE':r'^\s*;\s*toolchange',
-    'END_COLOR_CHANGE':r'^^\s*;\s*endchroma',
-    'EXTRUDE_PAT':r'^(G0?1\s+E-?(\d+\.?\d*|\.\d+))\s+F2400\s+',
-    'EXTRUDE_SUB':'%s F200\r\n'
-    
-    }
 
 
 class State(object):
@@ -238,6 +229,16 @@ class Processor(object):
 
     def printSummary(self):
         print self.state.summary()
+
+SETTINGS={
+    'EXTRUDER_CHANGE':r'^\s*;\s*changing logical extruder (from T[0-9])? to T([0-9])',
+    'BEGIN_LAYER':r'^\s*;\s*BEGIN_LAYER_OBJECT',
+    'BEGIN_COLOR_CHANGE':r'^\s*;\s*toolchange',
+    'END_COLOR_CHANGE':r'^^\s*;\s*endchroma',
+    'EXTRUDE_PAT':r'^(G0?1\s+E-?(\d+\.?\d*|\.\d+))\s+F-?(\d+\.?\d*|\.\d+))\s+',
+    'EXTRUDE_SUB':'%s F200\r\n'
+    
+    }
         
 if __name__ == '__main__':
     [c.setup(SETTINGS) for c in Command.__subclasses__()]
