@@ -260,7 +260,7 @@ if __name__ == '__main__':
     parser.add_argument('input',help='input file ',type=argparse.FileType('r'))
     parser.add_argument('-o', '--output',help='output file ',type=argparse.FileType('wb', 0),default='/dev/null')
     parser.add_argument('-v', '--verbosity',help='increase verbosity level ',action='count')
-    parser.add_argument('-t', '--transition-speed',help='sets the extrusion speed for side transitions ',type=float)
+    parser.add_argument('-t', '--transition-speed',help='sets the extrusion speed for side transitions ',type=float,default='200')
 
     args = parser.parse_args()
     proc=Processor(args)
