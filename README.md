@@ -1,5 +1,3 @@
-# palmod
-
 ## A simply tool to modify Canvans/Palette2 mcf.gcode files
 
 Palette 2 is a hardware to enable a 3D printer to print multi colored objects or objects
