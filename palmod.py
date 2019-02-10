@@ -1,18 +1,22 @@
 #!/usr/bin/env python
 ########################################################################
-# Copyright (c) 2019 by bernd.  All Rights Reserved 
-########################################################################
-# pypal.py
-# Author: bernd
-#- 
-# History:
-#      b - Jan 30, 2019: Created.
+# Copyright 2019 Bernd Breitenbach
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>
+#
 ########################################################################
 
 import argparse
 import re
-
-
 
 
 class State(object):
@@ -183,7 +187,7 @@ class ChangeSpeed(ModifyCommand):
     def process(self,line,processor):
         m=self.EXTRUDE_PAT.match(line)
         if m:
-            nline=self.EXTRUDE_SUB%m.group(1)
+            nline=self.EXTRUDE_SUB%(m.group(1),args.transition_speed)
             if processor.verbosity()>0:
                 print '%s changing "%s" --> "%s"'%(processor.state,line.strip(),nline.strip())
             line=nline
@@ -215,7 +219,7 @@ class Processor(object):
         self.extrNo=extrNo
 
     def verbosity(self):
-        return self.args.verbose
+        return self.args.verbosity
     
     def process(self):
         for line in args.input.readlines():
@@ -237,17 +241,26 @@ SETTINGS={
     'BEGIN_COLOR_CHANGE':r'^\s*;\s*toolchange',
     'END_COLOR_CHANGE':r'^^\s*;\s*endchroma',
     'EXTRUDE_PAT':r'^(G0?1\s+E-?(\d+\.?\d*|\.\d+))\s+F-?(\d+\.?\d*|\.\d+)\s*$',
-    'EXTRUDE_SUB':'%s F200\r\n'
+    'EXTRUDE_SUB':'%s F%s\r\n'
     
     }
-        
+
+DESCRIPTION="""
+Program for modifying palette mcf.gcode files.
+Copyright (C) 2019 Bernd Breitenbach
+This program comes with ABSOLUTELY NO WARRANTY.
+This is free software, and you are welcome to redistribute it
+under certain conditions; See COPYING for details.
+"""
+
 if __name__ == '__main__':
     [c.setup(SETTINGS) for c in Command.__subclasses__()]
     [c.setup(SETTINGS) for c in ModifyCommand.__subclasses__()]
-    parser = argparse.ArgumentParser(description='processing a palette gcode file')
+    parser = argparse.ArgumentParser(description=DESCRIPTION)
     parser.add_argument('input',help='input file ',type=argparse.FileType('r'))
     parser.add_argument('-o', '--output',help='output file ',type=argparse.FileType('wb', 0),default='/dev/null')
-    parser.add_argument('-v', '--verbose',help='verbosity level ',type=int,default=0)
+    parser.add_argument('-v', '--verbosity',help='increase verbosity level ',action='count')
+    parser.add_argument('-t', '--transition-speed',help='sets the extrusion speed for side transitions ',type=float)
 
     args = parser.parse_args()
     proc=Processor(args)
